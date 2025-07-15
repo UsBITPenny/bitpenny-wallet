@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BIT-Penny Wallet</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #0a0a0a;
+      color: #00ffcc;
+    }
+
+    #splash {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(145deg, #0f0f0f, #121212);
+      text-align: center;
+    }
+
+    #splash h1 {
+      font-size: 2.5em;
+      color: #00ffcc;
+      text-shadow: 0 0 10px #00ffcc;
+    }
+
+    #splash button {
+      margin-top: 30px;
+      padding: 12px 25px;
+      font-size: 1.1em;
+      background-color: #00ffcc;
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      cursor: pointer;
+      box-shadow: 0 0 10px #00ffcc;
+      transition: 0.3s;
+    }
+
+    #splash button:hover {
+      background-color: #00ffaa;
+    }
+
+    #wallet {
+      display: none;
+      padding: 20px;
+    }
+
+    .section {
+      margin-bottom: 25px;
+      background: #1c1c1c;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #00ffcc55;
+    }
+
+    h2 {
+      color: #00ffaa;
+    }
+
+    input, button {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 5px;
+      border: none;
+      font-size: 1em;
+    }
+
+    .green-glow {
+      color: #00ffcc;
+      font-weight: bold;
+      text-shadow: 0 0 5px #00ffcc;
+    }
+
+    .red-glow {
+      color: #ff4f4f;
+    }
+
+    #supply {
+      margin-top: 10px;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+
+<div id="splash">
+  <h1>🚀 Welcome to BIT-Penny (BITP)</h1>
+  <div id="supply">🔄 Total Supply: <span id="totalSupply">Loading...</span> BITP</div>
+  <button onclick="enterWallet()">Enter Wallet</button>
+</div>
+
+<div id="wallet">
+  <div class="section">
+    <h2>💰 BIT-Penny Wallet (BITP)</h2>
+    <p><strong>Address:</strong> <span id="walletAddress">Loading...</span></p>
+    <p><strong>Balance:</strong> <span id="balance">Loading...</span> BITP</p>
+  </div>
+
+  <div class="section">
+    <h2>📤 Send BITP</h2>
+    <input type="text" id="sender" placeholder="Sender address"><br>
+    <input type="text" id="recipient" placeholder="Recipient address"><br>
+    <input type="number" id="amount" placeholder="Amount to send"><br>
+    <button onclick="sendTransaction()">Send</button>
+  </div>
+
+  <div class="section">
+    <h2>📜 Transaction History</h2>
+    <div id="history"></div>
+  </div>
+</div>
+
+<script>
+  const myAddress = "156HhnAdchmSKHV9GdjP32wMau4cWGyPXg";
+
+  function enterWallet() {
+    localStorage.setItem('entered', 'yes');
+    document.getElementById('splash').style.display = 'none';
+    document.getElementById('wallet').style.display = 'block';
+    loadWallet();
+  }
+
+  function loadWallet() {
+    document.getElementById("walletAddress").innerText = myAddress;
+    fetch(`/balance/${myAddress}`)
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("balance").innerText = data.balance.toLocaleString();
+      });
+
+    fetch("/chain")
+      .then(res => res.json())
+      .then(data => {
+        let txs = [];
+        let total = 0;
+        data.chain.forEach(block => {
+          block.transactions.forEach(tx => {
+            if (tx.sender === "COINBASE") {
+              total += tx.amount;
+            }
+            if (tx.sender === myAddress || tx.recipient === myAddress) {
+              txs.push(`<p>From: <span class="${tx.sender === myAddress ? 'red-glow' : 'green-glow'}">${tx.sender}</span><br>
+                        To: <span class="${tx.recipient === myAddress ? 'green-glow' : 'red-glow'}">${tx.recipient}</span><br>
+                        Amount: ${tx.amount.toLocaleString()}</p><hr>`);
+            }
+          });
+        });
+        document.getElementById("history").innerHTML = txs.reverse().join('');
+        document.getElementById("totalSupply").innerText = total.toLocaleString();
+      });
+  }
+
+  function sendTransaction() {
+    const sender = document.getElementById("sender").value;
+    const recipient = document.getElementById("recipient").value;
+    const amount = parseInt(document.getElementById("amount").value);
+    fetch("/transactions/new", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({sender, recipient, amount})
+    }).then(() => {
+      alert("Transaction submitted!");
+      location.reload();
+    });
+  }
+
+  // Auto-enter if already opened before
+  if (localStorage.getItem('entered') === 'yes') {
+    document.getElementById('splash').style.display = 'none';
+    document.getElementById('wallet').style.display = 'block';
+    loadWallet();
+  }
+</script>
+
+</body>
+</html>
