@@ -1,223 +1,150 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BITPenny Exchange Wallet</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0; padding: 0;
-    }
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-    aside {
-      width: 250px;
-      background: #161b22;
-      padding: 2rem 1rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    aside img {
-      width: 80px;
-      border-radius: 50%;
-      margin-bottom: 1rem;
-    }
-    aside h1 {
-      font-size: 1.4rem;
-      margin-bottom: 2rem;
-      text-align: center;
-    }
-    main {
-      flex-grow: 1;
-      padding: 2rem;
-      overflow-y: auto;
-    }
-    .section {
-      margin-bottom: 2rem;
-    }
-    .section h2 {
-      margin-bottom: 1rem;
-      color: #58a6ff;
-    }
-    .card {
-      background: #21262d;
-      border: 1px solid #30363d;
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    label {
-      display: block;
-      margin-top: 1rem;
-    }
-    input, select {
-      margin-top: 0.5rem;
-      padding: 0.5rem;
-      width: 100%;
-      border-radius: 8px;
-      border: none;
-      background: #0d1117;
-      color: white;
-    }
-    button {
-      margin-top: 1rem;
-      padding: 0.6rem 1.2rem;
-      background: #238636;
-      border: none;
-      border-radius: 8px;
-      color: white;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    button:hover {
-      background: #2ea043;
-    }
-    .balance {
-      font-size: 2rem;
-      font-weight: bold;
-    }
-    .supply {
-      margin-top: 0.5rem;
-      color: #8b949e;
-    }
-    .auth-btn {
-      background: #1f6feb;
-      margin-top: 2rem;
-    }
-    .footer {
-      text-align: center;
-      font-size: 0.8rem;
-      color: #8b949e;
-      margin-top: 2rem;
-    }
-  </style>
-</head>
-<body>
-  <aside>
-    <img src="b55b75fd-ee9a-484b-ad01-d7b442522adf.jpg" alt="BITP Logo">
-    <h1>BIT-Penny Exchange</h1>
-    <button class="auth-btn" onclick="alert('Google Sign In coming soon!')">
-      <i class="fab fa-google"></i> Sign in with Google
-    </button>
-  </aside>
+import hashlib
+import json
+import os
+from time import time
+from flask import Flask, jsonify, request, send_file
 
-  <main>
-    <div class="section">
-      <h2>Your Balance</h2>
-      <div class="card">
-        <div class="balance" id="balance">Loading...</div>
-        <div class="supply" id="supply">Supply: ...</div>
-      </div>
-    </div>
+# === CONFIG ===
+COIN_NAME = "BIT-Penny"
+TICKER = "BITP"
+MAX_SUPPLY = 1_000_000_000_000
+REWARD_AMOUNT = 800_000_000
+MY_WALLET = "156HhnAdchmSKHV9GdjP32wMau4cWGyPXg"
 
-    <div class="section">
-      <h2>Buy / Sell BITP</h2>
-      <div class="card">
-        <label>Type</label>
-        <select id="tradeType">
-          <option value="buy">Buy BITP with USD</option>
-          <option value="sell">Sell BITP for USD</option>
-        </select>
-        <label>Amount</label>
-        <input type="number" id="tradeAmount" placeholder="Enter amount" />
-        <button onclick="submitTrade()">Submit Order</button>
-        <div id="tradeMessage"></div>
-      </div>
-    </div>
+# === BLOCKCHAIN CLASS ===
+class Blockchain:
+    def __init__(self):
+        self.chain = []
+        self.current_transactions = []
+        self.new_block(previous_hash='1', proof=100)
 
-    <div class="section">
-      <h2>Mine New Coins</h2>
-      <div class="card">
-        <button onclick="mine()">⛏️ Start Mining</button>
-        <div id="mineMsg"></div>
-      </div>
-    </div>
+    def new_block(self, proof, previous_hash=None):
+        block = {
+            'index': len(self.chain) + 1,
+            'timestamp': time(),
+            'transactions': self.current_transactions,
+            'proof': proof,
+            'previous_hash': previous_hash or self.hash(self.chain[-1]),
+        }
+        self.current_transactions = []
+        self.chain.append(block)
+        return block
 
-    <div class="section">
-      <h2>Transaction History</h2>
-      <div class="card" id="history">Loading...</div>
-    </div>
+    def new_transaction(self, sender, recipient, amount):
+        self.current_transactions.append({
+            'sender': sender,
+            'recipient': recipient,
+            'amount': amount,
+        })
+        return self.last_block['index'] + 1
 
-    <div class="footer">© 2025 BIT-Penny. All rights reserved.</div>
-  </main>
+    def get_balance(self, address):
+        balance = 0
+        for block in self.chain:
+            for tx in block.get('transactions', []):
+                if tx.get('sender') is None or tx.get('recipient') is None or tx.get('amount') is None:
+                    continue  # Skip malformed tx
+                if tx['recipient'] == address:
+                    balance += tx['amount']
+                if tx['sender'] == address:
+                    balance -= tx['amount']
+        return balance
 
-  <script>
-    const myAddress = "156HhnAdchmSKHV9GdjP32wMau4cWGyPXg";
+    def circulating_supply(self):
+        supply = 0
+        for block in self.chain:
+            for tx in block.get('transactions', []):
+                if tx.get('sender') == "COINBASE" and tx.get('amount') is not None:
+                    supply += tx['amount']
+        return supply
 
-    async function fetchBalance() {
-      const res = await fetch('/balance/' + myAddress);
-      const data = await res.json();
-      document.getElementById('balance').innerText = data.balance + " BITP";
-    }
+    def can_mine(self):
+        return self.circulating_supply() + REWARD_AMOUNT <= MAX_SUPPLY
 
-    async function fetchSupply() {
-      const res = await fetch('/supply');
-      const data = await res.json();
-      document.getElementById('supply').innerText = `Supply: ${data.supply.toLocaleString()} / ${data.max.toLocaleString()} ${data.ticker}`;
-    }
+    def hash(self, block):
+        block_string = json.dumps(block, sort_keys=True).encode()
+        return hashlib.sha256(block_string).hexdigest()
 
-    async function fetchHistory() {
-      const res = await fetch('/chain');
-      const data = await res.json();
-      let html = '';
-      data.chain.forEach(block => {
-        block.transactions.forEach(tx => {
-          if (tx.sender === myAddress || tx.recipient === myAddress) {
-            html += `<p>${tx.sender} ➡️ ${tx.recipient} : ${tx.amount} BITP</p>`;
-          }
-        });
-      });
-      document.getElementById('history').innerHTML = html || "No transactions yet.";
-    }
+    @property
+    def last_block(self):
+        return self.chain[-1]
 
-    async function mine() {
-      const res = await fetch('/mine');
-      const data = await res.json();
-      document.getElementById('mineMsg').innerText = data.message || "Mined block #" + data.index;
-      fetchBalance();
-      fetchSupply();
-      fetchHistory();
-    }
+    def proof_of_work(self, last_proof):
+        proof = 0
+        while not self.valid_proof(last_proof, proof):
+            proof += 1
+        return proof
 
-    async function submitTrade() {
-      const type = document.getElementById('tradeType').value;
-      const amount = parseFloat(document.getElementById('tradeAmount').value);
-      const messageDiv = document.getElementById('tradeMessage');
+    @staticmethod
+    def valid_proof(last_proof, proof):
+        guess = f'{last_proof}{proof}'.encode()
+        guess_hash = hashlib.sha256(guess).hexdigest()
+        return guess_hash[:4] == "0000"
 
-      if (!amount || amount <= 0) {
-        return messageDiv.innerText = "❗ Enter a valid amount.";
-      }
+# === FLASK SERVER ===
+app = Flask(__name__)
+blockchain = Blockchain()
 
-      let tx = {
-        sender: type === "buy" ? "USD_BANK" : myAddress,
-        recipient: type === "buy" ? myAddress : "USD_BANK",
-        amount: amount
-      };
+# === LOAD FROM FILE ===
+if os.path.exists("blockchain.json"):
+    try:
+        with open("blockchain.json", "r") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                blockchain.chain = data
+            else:
+                print("[ERROR] Invalid blockchain format in blockchain.json.")
+    except Exception as e:
+        print(f"[ERROR] Failed to load blockchain.json: {e}")
 
-      const res = await fetch("/transactions/new", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tx)
-      });
+@app.route('/')
+def wallet_ui():
+    return send_file("wallet.html")
 
-      const data = await res.json();
-      messageDiv.innerText = data.message || "✅ Order submitted.";
-      fetchBalance();
-      fetchHistory();
-    }
+@app.route('/mine', methods=['GET'])
+def mine():
+    if not blockchain.can_mine():
+        return jsonify({"message": "💸 Max coin supply reached. No more mining allowed."}), 400
 
-    fetchBalance();
-    fetchSupply();
-    fetchHistory();
-  </script>
-</body>
-</html>
+    last_proof = blockchain.last_block['proof']
+    proof = blockchain.proof_of_work(last_proof)
+
+    blockchain.new_transaction(sender="COINBASE", recipient=MY_WALLET, amount=REWARD_AMOUNT)
+    previous_hash = blockchain.hash(blockchain.last_block)
+    block = blockchain.new_block(proof, previous_hash)
+
+    with open("blockchain.json", "w") as f:
+        json.dump(blockchain.chain, f, indent=4)
+
+    return jsonify(block), 200
+
+@app.route('/transactions/new', methods=['POST'])
+def new_transaction():
+    data = request.get_json()
+    required = ['sender', 'recipient', 'amount']
+    if not all(k in data for k in required):
+        return 'Missing values', 400
+
+    index = blockchain.new_transaction(data['sender'], data['recipient'], data['amount'])
+    return jsonify({'message': f'Transaction will be added to Block {index}'}), 201
+
+@app.route('/chain', methods=['GET'])
+def full_chain():
+    return jsonify({'chain': blockchain.chain, 'length': len(blockchain.chain)}), 200
+
+@app.route('/balance/<address>', methods=['GET'])
+def get_balance(address):
+    balance = blockchain.get_balance(address)
+    return jsonify({'address': address, 'balance': balance}), 200
+
+@app.route('/supply', methods=['GET'])
+def supply():
+    return jsonify({
+        "ticker": TICKER,
+        "name": COIN_NAME,
+        "supply": blockchain.circulating_supply(),
+        "max": MAX_SUPPLY
+    }), 200
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)

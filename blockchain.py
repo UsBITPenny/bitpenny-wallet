@@ -42,10 +42,8 @@ class Blockchain:
         balance = 0
         for block in self.chain:
             for tx in block.get('transactions', []):
-                # Validate transaction structure
                 if tx.get('sender') is None or tx.get('recipient') is None or tx.get('amount') is None:
-                    print(f"[WARN] Skipping invalid transaction: {tx}")
-                    continue
+                    continue  # Skip malformed tx
                 if tx['recipient'] == address:
                     balance += tx['amount']
                 if tx['sender'] == address:
