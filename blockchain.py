@@ -85,7 +85,7 @@ class Blockchain:
 app = Flask(__name__)
 blockchain = Blockchain()
 
-# === LOAD FROM FILE ===
+# === LOAD CHAIN FROM FILE IF EXISTS ===
 if os.path.exists("blockchain.json"):
     try:
         with open("blockchain.json", "r") as f:
@@ -110,6 +110,7 @@ def mine():
     proof = blockchain.proof_of_work(last_proof)
 
     blockchain.new_transaction(sender="COINBASE", recipient=MY_WALLET, amount=REWARD_AMOUNT)
+
     previous_hash = blockchain.hash(blockchain.last_block)
     block = blockchain.new_block(proof, previous_hash)
 
@@ -124,7 +125,6 @@ def new_transaction():
     required = ['sender', 'recipient', 'amount']
     if not all(k in data for k in required):
         return 'Missing values', 400
-
     index = blockchain.new_transaction(data['sender'], data['recipient'], data['amount'])
     return jsonify({'message': f'Transaction will be added to Block {index}'}), 201
 
