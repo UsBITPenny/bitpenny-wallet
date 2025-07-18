@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BITPenny Exchange Wallet</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0; padding: 0;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    aside {
+      width: 250px;
+      background: #161b22;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    aside img {
+      width: 80px;
+      border-radius: 50%;
+      margin-bottom: 1rem;
+    }
+    aside h1 {
+      font-size: 1.4rem;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    main {
+      flex-grow: 1;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .section h2 {
+      margin-bottom: 1rem;
+      color: #58a6ff;
+    }
+    .card {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+    }
+    input, select {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      width: 100%;
+      border-radius: 8px;
+      border: none;
+      background: #0d1117;
+      color: white;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.6rem 1.2rem;
+      background: #238636;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #2ea043;
+    }
+    .balance {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    .supply {
+      margin-top: 0.5rem;
+      color: #8b949e;
+    }
+    .auth-btn {
+      background: #1f6feb;
+      margin-top: 2rem;
+    }
+    .footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #8b949e;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <aside>
+    <img src="b55b75fd-ee9a-484b-ad01-d7b442522adf.jpg" alt="BITP Logo">
+    <h1>BIT-Penny Exchange</h1>
+    <button class="auth-btn" onclick="alert('Google Sign In coming soon!')">
+      <i class="fab fa-google"></i> Sign in with Google
+    </button>
+  </aside>
+
+  <main>
+    <div class="section">
+      <h2>Your Balance</h2>
+      <div class="card">
+        <div class="balance" id="balance">Loading...</div>
+        <div class="supply" id="supply">Supply: ...</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Buy / Sell BITP</h2>
+      <div class="card">
+        <label>Type</label>
+        <select id="tradeType">
+          <option value="buy">Buy BITP with USD</option>
+          <option value="sell">Sell BITP for USD</option>
+        </select>
+        <label>Amount</label>
+        <input type="number" id="tradeAmount" placeholder="Enter amount" />
+        <button onclick="submitTrade()">Submit Order</button>
+        <div id="tradeMessage"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Mine New Coins</h2>
+      <div class="card">
+        <button onclick="mine()">⛏️ Start Mining</button>
+        <div id="mineMsg"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Transaction History</h2>
+      <div class="card" id="history">Loading...</div>
+    </div>
+
+    <div class="footer">© 2025 BIT-Penny. All rights reserved.</div>
+  </main>
+
+  <script>
+    const myAddress = "156HhnAdchmSKHV9GdjP32wMau4cWGyPXg";
+
+    async function fetchBalance() {
+      const res = await fetch('/balance/' + myAddress);
+      const data = await res.json();
+      document.getElementById('balance').innerText = data.balance + " BITP";
+    }
+
+    async function fetchSupply() {
+      const res = await fetch('/supply');
+      const data = await res.json();
+      document.getElementById('supply').innerText = `Supply: ${data.supply.toLocaleString()} / ${data.max.toLocaleString()} ${data.ticker}`;
+    }
+
+    async function fetchHistory() {
+      const res = await fetch('/chain');
+      const data = await res.json();
+      let html = '';
+      data.chain.forEach(block => {
+        block.transactions.forEach(tx => {
+          if (tx.sender === myAddress || tx.recipient === myAddress) {
+            html += `<p>${tx.sender} ➡️ ${tx.recipient} : ${tx.amount} BITP</p>`;
+          }
+        });
+      });
+      document.getElementById('history').innerHTML = html || "No transactions yet.";
+    }
+
+    async function mine() {
+      const res = await fetch('/mine');
+      const data = await res.json();
+      document.getElementById('mineMsg').innerText = data.message || "Mined block #" + data.index;
+      fetchBalance();
+      fetchSupply();
+      fetchHistory();
+    }
+
+    async function submitTrade() {
+      const type = document.getElementById('tradeType').value;
+      const amount = parseFloat(document.getElementById('tradeAmount').value);
+      const messageDiv = document.getElementById('tradeMessage');
+
+      if (!amount || amount <= 0) {
+        return messageDiv.innerText = "❗ Enter a valid amount.";
+      }
+
+      let tx = {
+        sender: type === "buy" ? "USD_BANK" : myAddress,
+        recipient: type === "buy" ? myAddress : "USD_BANK",
+        amount: amount
+      };
+
+      const res = await fetch("/transactions/new", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tx)
+      });
+
+      const data = await res.json();
+      messageDiv.innerText = data.message || "✅ Order submitted.";
+      fetchBalance();
+      fetchHistory();
+    }
+
+    fetchBalance();
+    fetchSupply();
+    fetchHistory();
+  </script>
+</body>
+</html>
