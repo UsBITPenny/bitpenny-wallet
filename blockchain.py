@@ -85,7 +85,7 @@ class Blockchain:
 app = Flask(__name__)
 blockchain = Blockchain()
 
-# === LOAD CHAIN FROM FILE IF EXISTS ===
+# === LOAD FROM FILE ===
 if os.path.exists("blockchain.json"):
     try:
         with open("blockchain.json", "r") as f:
